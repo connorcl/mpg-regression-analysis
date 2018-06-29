@@ -1,0 +1,71 @@
+---
+title: "Quantifying the Effect of Transmission Type on Gas Mileage Using Linear Regression"
+author: "Connor Claypool"
+date: "29 June 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(digits = 4, scipen = 999)
+```
+
+# Executive Summary
+
+This analysis used data from the 1974 _Motor Trend_ magazine and a linear regression model to estimate the effect of transmission type on gas mileage (MPG), while taking into account the effect of other relevant variables. The estimate of the model is that, given a specific 1/4 mile time and weight,
+
+$$\textrm{manual MPG} = \textrm{automatic MPG} + 14.1 - 4.1 \times \textrm{weight}$$
+where weight is given in thousands of pounds. According to this rule, manual cars have better MPG at weights lower than about 3400 lbs, while automatic cars perform better at greater weights. Additionally, this difference is greater the farther the weight is from 3400 lbs. However, there is a fair amount of uncertainty in the model's estimate - the margin of error for the number 14.1 is around 7, and the margin of error for the number 4.1 is around 2.5. This means that the relationship as estimated by the model is far from definite.
+
+# Analysis
+
+The difference between the distributions of MPG values based on transmission type is clearly demonstrated in a box plot of this data (see Appendix). However, this plot conveys no information as to the effect of confounding variables on this difference. To determine the influence transmission type has after adjusting for the impact of other relevant variables, a linear regression model was fit using transmission type, weight and quarter-mile time as predictors of MPG. These features were selected using a backwards elimination model selection strategy in which insignificant predictors are iteratively removed. The coefficients of this model and their corresponding p-values are shown in the table below.
+
+```{r, echo=T, results='asis'}
+library(xtable)
+model <- lm(mpg ~ am + wt + qsec, mtcars)
+print(xtable(model, digits = 4, caption = "Model Coefficients"), comment = F)
+```
+
+The fitted model has an adjusted R-squared of `r summary(model)$adj.r.squared`, indicating a fairly high goodness of fit. However, this model can be improved upon by including the interaction of transmission type and weight. The coefficients of this model are shown in the table below.
+
+```{r, echo=T, results='asis'}
+model <- lm(mpg ~ am * wt + qsec, mtcars)
+print(xtable(model, digits = 4, caption = "Model Coefficients"), comment = F)
+```
+
+This model has a better adjusted R-squared of `r summary(model)$adj.r.squared`. Furthermore, the table below, which summarizes the distribution of hat values for this model, shows that this model is not distorted by any extreme outliers.
+
+```{r, echo=T, results='asis'}
+hatvalue_summary <- t(as.matrix(summary(hatvalues(model))))
+print(xtable(hatvalue_summary, caption = "Distribution of Hat Values"), 
+      comment = F, include.rownames = F)
+```
+
+Finally, plotting the residuals against the fitted values and the theoretical normal quantiles (see Appendix) shows that they do not follow any clear pattern and are approximately normally distributed, in line with the assumptions of linear regression.
+
+# Results
+
+According to the coefficients estimated by the fitted model, the difference in mean MPG based on transmission type, for a specific weight and quarter mile time, can be represented by the equation
+$$\mathrm{MPG}_{manual} = \mathrm{MPG}_{auto} + `r coef(model)[2]` - `r abs(coef(model))[5]` \times \mathrm{weight}$$
+This equation indicates that manual transmissions are associated with higher MPG at weights lower 
+than approximately `r round((coef(model)[2]/abs(coef(model))[5])*1000)` lbs, with the difference becoming less pronounced the closer the weight is to this value. At greater weights, automatic transmissions are associated with higher MPG, with this difference becoming larger as weight increases. However, the 95% confidence intervals for the two model coefficients used in the above equation are wide; the first is between `r confint(model)[2,1]` and `r confint(model)[2,2]`, and the second is between `r confint(model)[5,1]` and `r confint(model)[5,2]`. This means there is a significant amount of uncertainty in this estimated relationship between transmission type and gas mileage.
+
+\newpage
+
+# Appendix
+ 
+```{r, echo=TRUE, fig.height=3, fig.width=4.5, fig.align='center'}
+data(mtcars)
+boxplot(mpg ~ am, mtcars, xaxt = "n", ylab = "MPG", cex = 0.75, cex.lab = 0.75)
+axis(side = 1, at = c(1, 2), labels = c("automatic", "manual"), cex.axis = 0.75)
+title(main = "Figure 1: MPG by Transmission Type", 
+      line = 0.75, cex.main = 0.75, font.main = 1)
+```
+ 
+```{r, echo=TRUE, fig.height=3}
+par(mfrow=c(1, 2))
+plot(model, which=c(1,2), caption = c("Figure 2: Residuals vs Fitted", 
+                                      "Figure 3: Normal Q-Q"), 
+     font.main = 1, cex.lab = 0.75, cex.caption = 0.75)
+```
